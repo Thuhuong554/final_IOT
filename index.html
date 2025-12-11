@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Garden AI - Doctor Integrated</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --bg-body: #f8fafc;
+            --text-primary: #0f172a;
+            --card-bg: #ffffff;
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-body); color: var(--text-primary); padding-bottom: 40px; }
+        
+        /* Dashboard Cards */
+        .pro-card {
+            background: var(--card-bg); border: 1px solid #e2e8f0; border-radius: 8px;
+            padding: 20px; height: 100%; box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            display: flex; flex-direction: column; justify-content: space-between;
+            transition: transform 0.2s;
+        }
+        .pro-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+
+        .label-sm { font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #64748b; letter-spacing: 0.05em; margin-bottom: 4px; }
+        .value-lg { font-size: 2rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+        .unit { font-size: 0.9rem; color: #94a3b8; font-weight: 500; margin-left: 2px; }
+
+        /* AI Panel */
+        .ai-panel { background: #1e1b4b; color: white; border: none; } /* Indigo Dark */
+        .ai-panel .label-sm { color: #a5b4fc; }
+        .ai-value { font-size: 1.5rem; font-weight: 700; }
+        
+        .terminal { 
+            background: #0f172a; border-radius: 6px; padding: 12px; 
+            font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; 
+            color: #4ade80; margin-top: 15px; border: 1px solid #312e81; 
+            height: 80px; overflow-y: auto;
+        }
+
+        /* Status Badge */
+        .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .bg-ok { background: #dcfce7; color: #166534; }
+        .bg-err { background: #fee2e2; color: #991b1b; }
+
+        /* Custom Colors */
+        .text-vpd { color: #6366f1; } /* Indigo */
+        .bg-vpd { background-color: #6366f1; }
+
+        /* Animations */
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg bg-white border-bottom py-3 sticky-top">
+        <div class="container-xl">
+            <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="#">
+                <i class="fas fa-leaf text-success"></i>
+                <span>Smart<span class="text-primary">Garden</span> AI</span>
+            </a>
+            <div class="d-flex align-items-center gap-3">
+                <div class="d-none d-md-block text-end me-3">
+                    <div class="label-sm mb-0">System Clock</div>
+                    <div class="font-monospace fw-bold" id="clock">--:--:--</div>
+                </div>
+                <span id="conn-badge" class="status-badge bg-err">Connecting...</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-xl mt-4">
+        
+        <!-- Live Sensors Row -->
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-lg-3">
+                <div class="pro-card" style="border-top: 4px solid #10b981;">
+                    <div class="label-sm">Soil Moisture</div>
+                    <div class="d-flex justify-content-between align-items-end">
+                        <div><span class="value-lg" id="soil-val">--</span><span class="unit">%</span></div>
+                        <i class="fas fa-seedling text-success fs-3 mb-1"></i>
+                    </div>
+                    <div class="mt-3 small text-muted d-flex justify-content-between">
+                        <span>Pump:</span>
+                        <span id="pump-status" class="fw-bold text-dark">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-lg-3">
+                <div class="pro-card" style="border-top: 4px solid #ef4444;">
+                    <div class="label-sm">Temperature</div>
+                    <div class="d-flex justify-content-between align-items-end">
+                        <div><span class="value-lg" id="temp-val">--</span><span class="unit">°C</span></div>
+                        <i class="fas fa-temperature-high text-danger fs-3 mb-1"></i>
+                    </div>
+                    <div class="progress mt-3" style="height: 4px;">
+                        <div id="temp-bar" class="progress-bar bg-danger" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-lg-3">
+                <div class="pro-card" style="border-top: 4px solid #3b82f6;">
+                    <div class="label-sm">Humidity</div>
+                    <div class="d-flex justify-content-between align-items-end">
+                        <div><span class="value-lg" id="humid-val">--</span><span class="unit">%</span></div>
+                        <i class="fas fa-tint text-primary fs-3 mb-1"></i>
+                    </div>
+                    <div class="progress mt-3" style="height: 4px;">
+                        <div id="humid-bar" class="progress-bar bg-primary" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-lg-3">
+                <div class="pro-card" style="border-top: 4px solid #6366f1;">
+                    <div class="label-sm">Vapor Pressure (VPD)</div>
+                    <div class="d-flex justify-content-between align-items-end">
+                        <div><span class="value-lg text-vpd" id="vpd-val">--</span><span class="unit">kPa</span></div>
+                        <i class="fas fa-cloud-sun text-vpd fs-3 mb-1"></i>
+                    </div>
+                    <div class="mt-3 badge bg-light text-vpd border border-light-subtle d-block text-center" id="vpd-status">
+                        Calculating...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Control Center -->
+        <div class="row g-4 mb-4">
+            <div class="col-lg-8">
+                <div class="pro-card ai-panel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold mb-0"><i class="fas fa-robot me-2"></i>AI Controller (VPD Logic)</h5>
+                        <span class="badge bg-white text-dark font-monospace">MODEL: v3.3-DIAG</span>
+                    </div>
+
+                    <div class="row text-center">
+                        <div class="col-4 border-end border-secondary">
+                            <div class="label-sm">AI Forecast (3H)</div>
+                            <div class="ai-value text-warning" id="ai-pred">--%</div>
+                            <small class="text-secondary" style="font-size: 0.7rem;">Predicted Soil Moisture</small>
+                        </div>
+                        <div class="col-4 border-end border-secondary">
+                            <div class="label-sm">Dynamic Threshold</div>
+                            <div class="ai-value text-info" id="ai-thresh">--%</div>
+                            <small class="text-secondary" style="font-size: 0.7rem;">Adjusted by VPD</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="label-sm">Decision</div>
+                            <div class="ai-value" id="ai-decision">WAIT</div>
+                            <i id="ai-icon" class="fas fa-clock text-secondary mt-1"></i>
+                        </div>
+                    </div>
+
+                    <div class="terminal">
+                        <div class="d-flex justify-content-between text-secondary mb-1" style="font-size: 0.7rem;">
+                            <span>kernel@esp32:~$ tail -f logic.log</span>
+                            <span id="log-time">--:--:--</span>
+                        </div>
+                        <div><span class="text-success">➜</span> <span id="ai-reason">Waiting for telemetry...</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Health (UPDATED FOR AI DOCTOR) -->
+            <div class="col-lg-4">
+                <div class="pro-card">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="label-sm">AI Doctor Diagnostics</div>
+                        <!-- New Deviation Badge -->
+                        <span id="dev-badge" class="badge bg-light text-dark border">Dev: --%</span>
+                    </div>
+                    <div class="flex-grow-1 d-flex flex-column justify-content-center align-items-center text-center">
+                        <i id="health-icon" class="fas fa-user-md fs-1 text-secondary mb-2"></i>
+                        <h5 class="fw-bold" id="health-text">Scanning...</h5>
+                        <p class="text-muted small mb-0" id="health-sub">Analyzing moisture deviation</p>
+                    </div>
+                    <div id="alert-box" class="alert alert-danger mt-3 mb-0 py-2 small d-none">
+                        <i class="fas fa-exclamation-triangle"></i> <span id="alert-msg">Error</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Historical Chart -->
+        <div class="pro-card p-0" style="height: 400px;">
+            <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-light">
+                <span class="fw-bold text-secondary"><i class="fas fa-chart-line me-2"></i>Environmental Trends</span>
+                <select class="form-select form-select-sm" style="width: auto;" onchange="updateHistoryLimit(this.value)">
+                    <option value="12">Last 3 Hours</option>
+                    <option value="24">Last 6 Hours</option>
+                    <option value="48" selected>Last 12 Hours</option>
+                </select>
+            </div>
+            <div class="p-3 h-100 position-relative">
+                <canvas id="mainChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000/api/v1"; 
+        let mainChart = null;
+        let historyLimit = 48; // Default 12 hours
+
+        // --- CLOCK ---
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString('en-US', {hour12: false});
+        }, 1000);
+
+        // --- CHART SETUP ---
+        function initChart() {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            Chart.defaults.font.family = "'Inter', sans-serif";
+            mainChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: [], datasets: [] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        y: { position: 'left', title: { display: true, text: 'Temp (°C)' } },
+                        y1: { position: 'right', min: 0, max: 100, grid: { display: false }, title: { display: true, text: 'Soil (%)' } }
+                    }
+                }
+            });
+        }
+
+        function updateHistoryLimit(val) {
+            historyLimit = val;
+            fetchHistory();
+        }
+
+        // --- FETCH LIVE DATA ---
+        async function fetchLive() {
+            try {
+                const res = await fetch(`${API_BASE}/sensors/live`);
+                if(!res.ok) throw new Error("Offline");
+                const data = await res.json();
+                
+                // Connection Check
+                if (data.status === "OFFLINE") throw new Error("Device Disconnected");
+
+                // Update Badge
+                document.getElementById('conn-badge').className = "status-badge bg-ok";
+                document.getElementById('conn-badge').innerHTML = '<i class="fas fa-wifi me-1"></i> ONLINE';
+
+                // Update Sensors
+                updateValue('soil-val', data.soilPercent, 0);
+                updateValue('temp-val', data.temperature, 1);
+                updateValue('humid-val', data.humidity, 0);
+                
+                // Update Bars
+                document.getElementById('temp-bar').style.width = Math.min((data.temperature/50)*100, 100) + "%";
+                document.getElementById('humid-bar').style.width = data.humidity + "%";
+
+                // Pump Status
+                const pEl = document.getElementById('pump-status');
+                if(data.pumpState) {
+                    pEl.innerHTML = '<span class="text-success"><i class="fas fa-cog fa-spin"></i> RUNNING</span>';
+                } else {
+                    pEl.innerHTML = '<span class="text-muted">IDLE</span>';
+                }
+
+                // Call AI endpoints
+                fetchDecision();
+                fetchDiagnostics(); // Fetch the "Doctor" report
+
+            } catch(e) {
+                console.log("Live fetch error", e);
+                document.getElementById('conn-badge').className = "status-badge bg-err";
+                document.getElementById('conn-badge').innerText = "OFFLINE";
+            }
+        }
+
+        // --- FETCH AI DECISION (VPD Logic) ---
+        async function fetchDecision() {
+            try {
+                const res = await fetch(`${API_BASE}/irrigation/decision`);
+                const data = await res.json();
+
+                if(data.decision === "OFFLINE") return;
+
+                // 1. UPDATE VPD CARD
+                const vpd = data.vpd_kpa;
+                document.getElementById('vpd-val').innerText = vpd.toFixed(2);
+                
+                const vpdStat = document.getElementById('vpd-status');
+                if(vpd < 0.75) { vpdStat.innerText = "LOW (Humid/Night)"; vpdStat.className = "mt-3 badge bg-info text-white d-block"; }
+                else if(vpd < 1.1) { vpdStat.innerText = "OPTIMAL"; vpdStat.className = "mt-3 badge bg-success text-white d-block"; }
+                else { vpdStat.innerText = "HIGH (Dry/Stress)"; vpdStat.className = "mt-3 badge bg-warning text-dark d-block"; }
+
+                // 2. UPDATE AI PANEL
+                let pred = data.forecast_soil;
+                let thresh = data.dynamic_threshold;
+                if (pred <= 1.0) pred = pred * 100;
+                if (thresh <= 1.0) thresh = thresh * 100;
+
+                document.getElementById('ai-pred').innerText = pred.toFixed(1) + "%";
+                document.getElementById('ai-thresh').innerText = thresh.toFixed(1) + "%";
+                document.getElementById('ai-reason').innerText = data.reason || "Analyzing...";
+                document.getElementById('log-time').innerText = new Date().toLocaleTimeString();
+
+                // 3. DECISION
+                const decEl = document.getElementById('ai-decision');
+                const iconEl = document.getElementById('ai-icon');
+                if(data.decision === "IRRIGATE") {
+                    decEl.innerText = "IRRIGATE";
+                    decEl.className = "ai-value text-success pulse";
+                    iconEl.className = "fas fa-tint text-success fs-2";
+                } else {
+                    decEl.innerText = "WAIT";
+                    decEl.className = "ai-value text-secondary";
+                    iconEl.className = "fas fa-pause text-secondary fs-2";
+                }
+
+            } catch(e) { console.error("AI Fetch Error", e); }
+        }
+
+        // --- FETCH DIAGNOSTICS (AI DOCTOR) ---
+        async function fetchDiagnostics() {
+            try {
+                const res = await fetch(`${API_BASE}/system/diagnostics`);
+                const data = await res.json();
+
+                const hIcon = document.getElementById('health-icon');
+                const hText = document.getElementById('health-text');
+                const hSub = document.getElementById('health-sub');
+                const alertBox = document.getElementById('alert-box');
+                const devBadge = document.getElementById('dev-badge');
+
+                // Deviation Badge
+                if(data.deviation_percent !== undefined) {
+                    // Show deviation with + or - sign
+                    const val = data.deviation_percent;
+                    devBadge.innerText = `Dev: ${val > 0 ? '+' : ''}${val.toFixed(1)}%`;
+                    
+                    if(Math.abs(val) > 10) devBadge.className = "badge bg-danger text-white border";
+                    else if(Math.abs(val) > 5) devBadge.className = "badge bg-warning text-dark border";
+                    else devBadge.className = "badge bg-light text-dark border";
+                }
+
+                // Health Logic
+                if(data.health_status === "NORMAL") {
+                    hIcon.className = "fas fa-user-md fs-1 text-success mb-2";
+                    hText.innerText = "System Healthy";
+                    hText.className = "fw-bold text-success";
+                    hSub.innerText = "Prediction matches reality";
+                    alertBox.classList.add('d-none');
+                } else {
+                    hIcon.className = "fas fa-user-md fs-1 text-danger mb-2 fa-beat";
+                    hText.innerText = data.health_status;
+                    hText.className = "fw-bold text-danger";
+                    hSub.innerText = "Anomaly Detected";
+                    alertBox.classList.remove('d-none');
+                    // Show first alert
+                    document.getElementById('alert-msg').innerText = (data.alerts && data.alerts.length) ? data.alerts[0] : "Hardware fault detected";
+                }
+
+            } catch(e) { console.error("Diag Fetch Error", e); }
+        }
+
+        // --- FETCH HISTORY CHART ---
+        async function fetchHistory() {
+    try {
+        const res = await fetch(`${API_BASE}/sensors/history?limit=${historyLimit}`);
+        const raw = await res.json();
+        if(!raw.length) return;
+
+        // --- PHẦN ĐÃ SỬA ---
+        const labels = raw.map(d => {
+            const dt = new Date(d.timestamp);
+            
+            // Lấy ngày, tháng, giờ, phút và thêm số 0 ở đầu nếu cần
+            const day = dt.getDate().toString().padStart(2, '0');
+            const month = (dt.getMonth() + 1).toString().padStart(2, '0');
+            const hour = dt.getHours().toString().padStart(2, '0');
+            const min = dt.getMinutes().toString().padStart(2, '0');
+            
+            // Kết quả: "03/12 14:05"
+            return `${day}/${month} ${hour}:${min}`;
+        });
+        // -------------------
+
+        const temp = raw.map(d => d.temperature);
+        const soil = raw.map(d => d.soilPercent);
+
+        mainChart.data.labels = labels;
+        mainChart.data.datasets = [
+            { label: 'Temp (°C)', data: temp, borderColor: '#ef4444', tension: 0.4, yAxisID: 'y' },
+            { label: 'Soil (%)', data: soil, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.4, yAxisID: 'y1' }
+        ];
+        mainChart.update();
+    } catch(e) {
+        console.log("History fetch error:", e);
+    }
+}
+        function updateValue(id, val, decimals) {
+            const el = document.getElementById(id);
+            if(val === null || val === undefined) el.innerText = "--";
+            else el.innerText = Number(val).toFixed(decimals);
+        }
+
+        // Init
+        initChart();
+        fetchLive();
+        fetchHistory();
+
+        // Loops
+        setInterval(fetchLive, 2000);   // Live data + AI + Doctor every 2s
+        setInterval(fetchHistory, 15000); // Chart every 15s
+
+    </script>
+</body>
+</html>
